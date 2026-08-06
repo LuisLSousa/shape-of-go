@@ -30,9 +30,21 @@ Every stage is idempotent and resumable: interrupt at any point and
 re-run to continue. All randomness is seeded; the graph snapshot is
 dated so the whole essay reproduces from one command per stage.
 
+## Syncing the index
+
+```sh
+go build -o bin/indexsync ./cmd/indexsync
+nohup ./bin/indexsync >> data/sync.log 2>&1 &
+```
+
+Fully resumable: checkpointed after every page, infinite retry with
+backoff on network failure (laptop sleep just stalls it), flock-guarded
+against double launches. If it ever dies, re-run the same command — it
+continues where it stopped. Progress: `tail -f data/sync.log`.
+
 ## Status
 
-Pipeline scaffolding. See the essay when it ships.
+Pipeline scaffolding; index sync in progress. See the essay when it ships.
 
 ## License
 

@@ -1,3 +1,4 @@
 data/
 results/*.tmp
 .DS_Store
+bin/
