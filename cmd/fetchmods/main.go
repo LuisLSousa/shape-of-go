@@ -58,7 +58,8 @@ func main() {
 	var (
 		index       = flag.String("index", "data/index.jsonl", "synced module index (JSONL)")
 		outDir      = flag.String("out", "data/mods", "shard output directory")
-		workers     = flag.Int("workers", 16, "concurrent fetchers (politeness: 64 tripped proxy abuse protection)")
+		workers     = flag.Int("workers", 16, "concurrent fetchers")
+		rate        = flag.Int("rate", 120, "global request rate cap per second (politeness: ~740/s tripped proxy abuse protection)")
 		maxMods     = flag.Int("max", 0, "fetch at most this many modules (0 = all; for testing)")
 		retryErrors = flag.Bool("retry-errors", false, "re-attempt modules previously recorded as errors")
 	)
@@ -93,6 +94,7 @@ func main() {
 		return
 	}
 
+	startTokens(*rate)
 	var fetched, failed atomic.Int64
 	start := time.Now()
 	jobs := make(chan string)
@@ -230,18 +232,46 @@ func worker(shard int, dir string, client *http.Client, jobs <-chan string, fetc
 	}
 }
 
-// pausedUntil coordinates a global cooldown: when the proxy signals
-// throttling (403), every worker backs off together instead of 64
-// independent retry schedules continuing to hammer the quota.
-var pausedUntil atomic.Int64 // unix nanoseconds
+// tokens is the global rate limiter: every request takes one token,
+// refilled at the -rate cap. Staying well under the proxy's abuse
+// threshold beats reacting to it after the fact.
+var tokens chan struct{}
 
-func globalPause(d time.Duration) {
-	target := time.Now().Add(d).UnixNano()
-	for {
-		cur := pausedUntil.Load()
-		if cur >= target || pausedUntil.CompareAndSwap(cur, target) {
-			return
+func startTokens(perSecond int) {
+	tokens = make(chan struct{}, perSecond/4+1)
+	go func() {
+		t := time.NewTicker(time.Second / time.Duration(perSecond))
+		defer t.Stop()
+		for range t.C {
+			select {
+			case tokens <- struct{}{}:
+			default: // bucket full: don't bank unbounded burst
+			}
 		}
+	}()
+}
+
+// Storm breaker: scattered 403s are per-module legal blocks and only
+// cost that module, but a long run of consecutive 403s with no success
+// in between means the proxy is refusing *us* — then the whole fleet
+// pauses. A single blocked module can never trip this, because every
+// success resets the streak.
+var (
+	consec403   atomic.Int64
+	pausedUntil atomic.Int64 // unix nanoseconds
+)
+
+func note403() {
+	if consec403.Add(1) >= 30 {
+		consec403.Store(0)
+		target := time.Now().Add(2 * time.Minute).UnixNano()
+		for {
+			cur := pausedUntil.Load()
+			if cur >= target || pausedUntil.CompareAndSwap(cur, target) {
+				break
+			}
+		}
+		log.Printf("403 storm detected: pausing all workers 2m")
 	}
 }
 
@@ -255,10 +285,11 @@ func waitIfPaused() {
 	}
 }
 
-// fetchOne downloads one go.mod. Gone/NotFound are permanent; a 403
-// triggers a global cooldown (proxy abuse protection) and retries;
-// other failures retry with backoff up to 8 attempts before being
-// recorded as errors (re-run with -retry-errors to try again).
+// fetchOne downloads one go.mod. Gone/NotFound are permanent; 403 is
+// recorded after 3 patient tries (some modules are legally blocked and
+// will never succeed); other failures retry with backoff up to 8
+// attempts before being recorded as errors (re-run with -retry-errors
+// to try again).
 func fetchOne(client *http.Client, path, version string) shardRecord {
 	rec := shardRecord{Path: path, Version: version}
 	ep, err1 := module.EscapePath(path)
@@ -270,14 +301,17 @@ func fetchOne(client *http.Client, path, version string) shardRecord {
 	u := fmt.Sprintf("%s/%s/@v/%s.mod", proxyURL, ep, ev)
 
 	backoff := time.Second
+	forbidden := 0
 	for attempt := 1; ; attempt++ {
 		waitIfPaused()
+		<-tokens
 		req, _ := http.NewRequest(http.MethodGet, u, nil)
 		req.Header.Set("User-Agent", "shape-of-go/0.1 (+https://github.com/LuisLSousa/shape-of-go)")
 		resp, err := client.Do(req)
 		if err == nil {
 			switch resp.StatusCode {
 			case http.StatusOK:
+				consec403.Store(0)
 				body, readErr := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 				resp.Body.Close()
 				if readErr == nil {
@@ -286,19 +320,19 @@ func fetchOne(client *http.Client, path, version string) shardRecord {
 				}
 				err = readErr
 			case http.StatusNotFound, http.StatusGone:
+				consec403.Store(0)
 				resp.Body.Close()
 				rec.Err = resp.Status // permanent: removed or never valid
 				return rec
 			case http.StatusForbidden:
-				// Throttled (or legally blocked — rare). Cool the whole
-				// fleet down and be patient before giving up on it.
 				io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 				resp.Body.Close()
-				globalPause(20 * time.Second)
-				if attempt >= 12 {
-					rec.Err = "403 Forbidden (persisted through cooldowns)"
+				note403()
+				if forbidden++; forbidden >= 3 {
+					rec.Err = "403 Forbidden"
 					return rec
 				}
+				time.Sleep(5 * time.Second)
 				continue
 			default:
 				io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
