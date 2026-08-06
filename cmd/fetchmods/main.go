@@ -58,7 +58,7 @@ func main() {
 	var (
 		index       = flag.String("index", "data/index.jsonl", "synced module index (JSONL)")
 		outDir      = flag.String("out", "data/mods", "shard output directory")
-		workers     = flag.Int("workers", 64, "concurrent fetchers")
+		workers     = flag.Int("workers", 16, "concurrent fetchers (politeness: 64 tripped proxy abuse protection)")
 		maxMods     = flag.Int("max", 0, "fetch at most this many modules (0 = all; for testing)")
 		retryErrors = flag.Bool("retry-errors", false, "re-attempt modules previously recorded as errors")
 	)
@@ -108,11 +108,15 @@ func main() {
 	go func() {
 		t := time.NewTicker(30 * time.Second)
 		defer t.Stop()
-		for range t.C {
+		var lastTotal int64
+		lastTick := start
+		for now := range t.C {
 			f, e := fetched.Load(), failed.Load()
-			rate := float64(f+e) / time.Since(start).Seconds()
-			rem := time.Duration(float64(len(work)-int(f+e))/max(rate, 1)) * time.Second
-			log.Printf("%d fetched, %d errors, %.0f/s, ~%s remaining", f, e, rate, rem.Round(time.Minute))
+			winRate := float64(f+e-lastTotal) / now.Sub(lastTick).Seconds()
+			lastTotal, lastTick = f+e, now
+			rem := time.Duration(float64(len(work)-int(f+e))/max(winRate, 1)) * time.Second
+			log.Printf("%d fetched, %d errors, %.0f/s (30s window), ~%s remaining",
+				f, e, winRate, rem.Round(time.Minute))
 		}
 	}()
 	for _, p := range work {
@@ -226,9 +230,35 @@ func worker(shard int, dir string, client *http.Client, jobs <-chan string, fetc
 	}
 }
 
-// fetchOne downloads one go.mod. Gone/NotFound are permanent; other
-// failures retry with backoff up to 8 attempts before being recorded
-// as errors (re-run with -retry-errors to try again).
+// pausedUntil coordinates a global cooldown: when the proxy signals
+// throttling (403), every worker backs off together instead of 64
+// independent retry schedules continuing to hammer the quota.
+var pausedUntil atomic.Int64 // unix nanoseconds
+
+func globalPause(d time.Duration) {
+	target := time.Now().Add(d).UnixNano()
+	for {
+		cur := pausedUntil.Load()
+		if cur >= target || pausedUntil.CompareAndSwap(cur, target) {
+			return
+		}
+	}
+}
+
+func waitIfPaused() {
+	for {
+		d := time.Until(time.Unix(0, pausedUntil.Load()))
+		if d <= 0 {
+			return
+		}
+		time.Sleep(min(d, time.Second))
+	}
+}
+
+// fetchOne downloads one go.mod. Gone/NotFound are permanent; a 403
+// triggers a global cooldown (proxy abuse protection) and retries;
+// other failures retry with backoff up to 8 attempts before being
+// recorded as errors (re-run with -retry-errors to try again).
 func fetchOne(client *http.Client, path, version string) shardRecord {
 	rec := shardRecord{Path: path, Version: version}
 	ep, err1 := module.EscapePath(path)
@@ -241,6 +271,7 @@ func fetchOne(client *http.Client, path, version string) shardRecord {
 
 	backoff := time.Second
 	for attempt := 1; ; attempt++ {
+		waitIfPaused()
 		req, _ := http.NewRequest(http.MethodGet, u, nil)
 		req.Header.Set("User-Agent", "shape-of-go/0.1 (+https://github.com/LuisLSousa/shape-of-go)")
 		resp, err := client.Do(req)
@@ -258,6 +289,17 @@ func fetchOne(client *http.Client, path, version string) shardRecord {
 				resp.Body.Close()
 				rec.Err = resp.Status // permanent: removed or never valid
 				return rec
+			case http.StatusForbidden:
+				// Throttled (or legally blocked — rare). Cool the whole
+				// fleet down and be patient before giving up on it.
+				io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+				resp.Body.Close()
+				globalPause(20 * time.Second)
+				if attempt >= 12 {
+					rec.Err = "403 Forbidden (persisted through cooldowns)"
+					return rec
+				}
+				continue
 			default:
 				io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 				resp.Body.Close()
