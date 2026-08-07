@@ -306,6 +306,21 @@ canvas.galaxy.dragging {
   line-height: 1.4;
 }
 
+/* ---- selected-node ring ---- */
+.sel-marker {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px rgba(255, 255, 255, 0.35),
+    inset 0 0 6px rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
 /* ---- hover tooltip ---- */
 .tooltip {
   position: absolute;

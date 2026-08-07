@@ -245,15 +245,20 @@ export class GalaxyRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT)
 
     if (this.edges.length > 0) {
-      gl.useProgram(this.lineProgram)
-      gl.uniform2f(this.lineUniforms.uCenter, camera.cx, camera.cy)
-      gl.uniform1f(this.lineUniforms.uZoom, camera.zoom)
-      gl.uniform2f(this.lineUniforms.uViewport, widthPx, heightPx)
-      for (const e of this.edges) {
-        gl.bindVertexArray(e.vao)
-        gl.uniform3f(this.lineUniforms.uColor, e.color[0], e.color[1], e.color[2])
-        gl.uniform1f(this.lineUniforms.uAlpha, Math.min(0.3, 220 / e.count))
-        gl.drawArrays(gl.LINES, 0, e.count)
+      // Rays answer "how far does this reach" at overview zoom; up
+      // close they are pure glare, so fade them out as zoom deepens.
+      const zoomFade = Math.min(1, (camera.fitZoom * 4) / camera.zoom)
+      if (zoomFade > 0.02) {
+        gl.useProgram(this.lineProgram)
+        gl.uniform2f(this.lineUniforms.uCenter, camera.cx, camera.cy)
+        gl.uniform1f(this.lineUniforms.uZoom, camera.zoom)
+        gl.uniform2f(this.lineUniforms.uViewport, widthPx, heightPx)
+        for (const e of this.edges) {
+          gl.bindVertexArray(e.vao)
+          gl.uniform3f(this.lineUniforms.uColor, e.color[0], e.color[1], e.color[2])
+          gl.uniform1f(this.lineUniforms.uAlpha, Math.min(0.3, 220 / e.count) * zoomFade)
+          gl.drawArrays(gl.LINES, 0, e.count)
+        }
       }
     }
 

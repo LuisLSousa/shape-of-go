@@ -61,15 +61,23 @@ export async function loadNbrIndex(): Promise<Set<number>> {
   return new Set(new Uint32Array(buf))
 }
 
-export async function loadNeighbors(idx: number): Promise<Neighbors> {
-  const buf = await fetchBuffer(`${BASE}nbr/${idx}.bin`)
-  const header = new Uint32Array(buf, 0, 2)
-  const nIn = header[0]
-  const nOut = header[1]
-  return {
-    dependents: new Uint32Array(buf, 8, nIn),
-    dependencies: new Uint32Array(buf, 8 + 4 * nIn, nOut),
+const nbrCache = new Map<number, Promise<Neighbors>>()
+
+export function loadNeighbors(idx: number): Promise<Neighbors> {
+  let p = nbrCache.get(idx)
+  if (!p) {
+    p = fetchBuffer(`${BASE}nbr/${idx}.bin`).then((buf) => {
+      const header = new Uint32Array(buf, 0, 2)
+      const nIn = header[0]
+      const nOut = header[1]
+      return {
+        dependents: new Uint32Array(buf, 8, nIn),
+        dependencies: new Uint32Array(buf, 8 + 4 * nIn, nOut),
+      }
+    })
+    nbrCache.set(idx, p)
   }
+  return p
 }
 
 // Labels arrive in fixed-size JSON chunks; hovering only ever needs a

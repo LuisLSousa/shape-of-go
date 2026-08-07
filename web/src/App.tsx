@@ -69,6 +69,8 @@ export default function App() {
   const cameraRef = useRef(new Camera())
   const modeRef = useRef(mode)
   const hasSelectionRef = useRef(false)
+  const selIdxRef = useRef(-1)
+  const markerRef = useRef<HTMLDivElement>(null)
   modeRef.current = mode
 
   // ---- data load ----
@@ -164,6 +166,17 @@ export default function App() {
       camera.tick(now)
       const { w, h, dpr } = resize()
       renderer.render(camera, w, h, dpr, modeRef.current, hasSelectionRef.current)
+      const marker = markerRef.current
+      if (marker) {
+        const sel = selIdxRef.current
+        if (sel >= 0) {
+          const [px, py] = camera.worldToScreen(data.positions[2 * sel], data.positions[2 * sel + 1], w, h)
+          marker.style.display = px < -40 || px > w + 40 || py < -40 || py > h + 40 ? 'none' : 'block'
+          marker.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%)`
+        } else {
+          marker.style.display = 'none'
+        }
+      }
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -177,6 +190,7 @@ export default function App() {
   const clearSelection = useCallback(() => {
     setSelection(null)
     hasSelectionRef.current = false
+    selIdxRef.current = -1
     rendererRef.current?.setStates(null)
     rendererRef.current?.setEdges([])
   }, [])
@@ -197,6 +211,7 @@ export default function App() {
       }
       setSelection(base)
       hasSelectionRef.current = true
+      selIdxRef.current = idx
 
       if (data.nbrSet.has(idx)) {
         const nbr = await loadNeighbors(idx)
@@ -250,31 +265,68 @@ export default function App() {
     [data],
   )
 
-  const flyToNode = useCallback(
-    (idx: number) => {
-      if (!data || !canvasRef.current) return
+  // Target zoom that frames a node's actual neighborhood: the 65th
+  // percentile of its neighbors' distances decides the field of view,
+  // so testify (dependents everywhere) frames near-overview while a
+  // local hub frames its own cluster. Leaves get a fixed close-up.
+  const frameZoom = useCallback(
+    async (idx: number, w: number, h: number): Promise<number> => {
+      if (!data) return 1
       const camera = cameraRef.current
+      const closeUp = Math.min(w, h) / 2400
+      if (!data.nbrSet.has(idx)) return Math.max(camera.fitZoom, closeUp)
+      const nbr = await loadNeighbors(idx)
+      const total = nbr.dependents.length + nbr.dependencies.length
+      if (total < 8) return Math.max(camera.fitZoom, closeUp)
+      const sx = data.positions[2 * idx]
+      const sy = data.positions[2 * idx + 1]
+      const dists: number[] = []
+      const push = (list: Uint32Array) => {
+        const stride = Math.max(1, Math.floor(list.length / 2000))
+        for (let k = 0; k < list.length; k += stride) {
+          const j = list[k]
+          dists.push(Math.hypot(data.positions[2 * j] - sx, data.positions[2 * j + 1] - sy))
+        }
+      }
+      push(nbr.dependents)
+      push(nbr.dependencies)
+      dists.sort((a, b) => a - b)
+      const r = dists[Math.floor(dists.length * 0.65)]
+      const zoom = Math.min(w, h) / (2.6 * Math.max(r, 1))
+      return Math.min(Math.max(zoom, camera.fitZoom), closeUp * 2.4)
+    },
+    [data],
+  )
+
+  const flyToNode = useCallback(
+    async (idx: number) => {
+      if (!data || !canvasRef.current) return
       const w = canvasRef.current.clientWidth
       const h = canvasRef.current.clientHeight
-      // Zoom so the neighborhood fills the view but context survives.
-      const targetZoom = Math.max(camera.zoom, Math.min(w, h) / 900)
-      camera.flyTo(data.positions[2 * idx], data.positions[2 * idx + 1], targetZoom)
+      const zoom = await frameZoom(idx, w, h)
+      cameraRef.current.flyTo(data.positions[2 * idx], data.positions[2 * idx + 1], zoom)
       void select(idx)
     },
-    [data, select],
+    [data, select, frameZoom],
   )
 
   // ?m=<module path> deep-links straight to a module (also handy for
-  // headless screenshot tests of the selection state).
+  // headless screenshot tests of the selection state). Deep links jump
+  // instantly — the fly-to animation is for interactive search only.
   useEffect(() => {
-    if (!data) return
+    if (!data || !canvasRef.current) return
     const target = new URLSearchParams(window.location.search).get('m')
     if (!target) return
     const row = data.search.find((r) => r[0] === target)
     if (!row) return
-    const t = window.setTimeout(() => flyToNode(row[1]), 400)
-    return () => window.clearTimeout(t)
-  }, [data, flyToNode])
+    const canvas = canvasRef.current
+    const idx = row[1]
+    void (async () => {
+      const zoom = await frameZoom(idx, canvas.clientWidth, canvas.clientHeight)
+      cameraRef.current.jumpTo(data.positions[2 * idx], data.positions[2 * idx + 1], zoom)
+      void select(idx)
+    })()
+  }, [data, select, frameZoom])
 
   // ---- pointer input ----
   useEffect(() => {
@@ -403,6 +455,7 @@ export default function App() {
   return (
     <div className="app">
       <canvas ref={canvasRef} className="galaxy" />
+      <div ref={markerRef} className="sel-marker" />
 
       {!data && (
         <div className="loading">
