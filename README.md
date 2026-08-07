@@ -23,6 +23,9 @@ cmd/indexsync   stream the full index → data/index.jsonl   (resumable, checkpo
 cmd/fetchmods   latest version per module → fetch go.mod   (concurrent, disk-cached, resumable)
 cmd/buildgraph  parse require directives → edge list + node table
 cmd/analyze     degree distributions, load-bearing modules, components, communities
+cmd/layout      ForceAtlas2 + Barnes-Hut over the giant component → 2-D galaxy positions
+cmd/export      layout run → static viewer assets (positions, attrs, labels, hub neighbors)
+web/            the interactive galaxy: WebGL2 viewer, Vite + React + TS
 essay/          the write-up and figures
 ```
 
@@ -42,9 +45,28 @@ backoff on network failure (laptop sleep just stalls it), flock-guarded
 against double launches. If it ever dies, re-run the same command — it
 continues where it stopped. Progress: `tail -f data/sync.log`.
 
+## The galaxy
+
+`cmd/layout` runs deterministic ForceAtlas2 (Barnes-Hut repulsion,
+adaptive speed, parallel force passes) over the 1.24M-node giant
+component — about five minutes on a laptop — and `cmd/export` packages
+positions plus attributes into static binary assets:
+
+```sh
+go build -o bin/layout ./cmd/layout && ./bin/layout
+go build -o bin/export ./cmd/export && ./bin/export
+cd web && npm install && npm run dev
+```
+
+The viewer renders the entire component as one additive-blended WebGL
+point cloud: brightness and size follow log in-degree (or first-seen
+cohort year), search covers the top 20k modules, and clicking a hub
+lights up every module that imports it.
+
 ## Status
 
-Pipeline scaffolding; index sync in progress. See the essay when it ships.
+Data pipeline and analysis complete (snapshot 2026-08-06); interactive
+galaxy viewer working. Essay in progress.
 
 ## License
 
