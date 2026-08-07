@@ -8,6 +8,7 @@ import {
   loadPositions,
   loadSearch,
   type Manifest,
+  type NbrIndex,
   type SearchRow,
 } from './galaxy/data'
 import { Camera } from './galaxy/camera'
@@ -30,7 +31,7 @@ interface Dataset {
   degNorm: Float32Array
   grid: SpatialGrid
   search: SearchRow[]
-  nbrSet: Set<number>
+  nbrIndex: NbrIndex
 }
 
 interface Selection {
@@ -80,7 +81,7 @@ export default function App() {
       try {
         const manifest = await loadManifest()
         setProgress(0.1)
-        const [positions, attrs, search, nbrSet] = await Promise.all([
+        const [positions, attrs, search, nbrIndex] = await Promise.all([
           loadPositions(manifest.nodes).then((p) => {
             if (!cancelled) setProgress(0.55)
             return p
@@ -99,7 +100,7 @@ export default function App() {
         for (let i = 0; i < n; i++) degNorm[i] = Math.log1p(attrs.inDeg[i]) / logMax
         const grid = new SpatialGrid(positions, degNorm)
         setProgress(1)
-        setData({ manifest, positions, inDeg: attrs.inDeg, years: attrs.years, degNorm, grid, search, nbrSet })
+        setData({ manifest, positions, inDeg: attrs.inDeg, years: attrs.years, degNorm, grid, search, nbrIndex })
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       }
@@ -213,8 +214,8 @@ export default function App() {
       hasSelectionRef.current = true
       selIdxRef.current = idx
 
-      if (data.nbrSet.has(idx)) {
-        const nbr = await loadNeighbors(idx)
+      if (data.nbrIndex.has(idx)) {
+        const nbr = await loadNeighbors(data.nbrIndex, idx)
         // A newer click may have replaced this selection while the
         // neighbor list was in flight.
         setSelection((cur) => {
@@ -274,8 +275,8 @@ export default function App() {
       if (!data) return 1
       const camera = cameraRef.current
       const closeUp = Math.min(w, h) / 2400
-      if (!data.nbrSet.has(idx)) return Math.max(camera.fitZoom, closeUp)
-      const nbr = await loadNeighbors(idx)
+      if (!data.nbrIndex.has(idx)) return Math.max(camera.fitZoom, closeUp)
+      const nbr = await loadNeighbors(data.nbrIndex, idx)
       const total = nbr.dependents.length + nbr.dependencies.length
       if (total < 8) return Math.max(camera.fitZoom, closeUp)
       const sx = data.positions[2 * idx]
