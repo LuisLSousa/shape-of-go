@@ -40,13 +40,22 @@ func main() {
 		graphDir   = flag.String("graph", "data/graph", "buildgraph output directory")
 		indexPath  = flag.String("index", "data/index.jsonl", "module index feed (for first-seen years)")
 		webDir     = flag.String("web", "web/public/data", "viewer asset output directory")
-		searchTop  = flag.Int("search-top", 20000, "modules in the search table")
-		nbrTop     = flag.Int("nbr-top", 20000, "hubs that get a neighbor file")
+		searchTop  = flag.Int("search-top", 50000, "modules in the search table")
+		nbrTop     = flag.Int("nbr-top", 50000, "top modules by in-degree that get a neighbor file (superset of the search table, so every search hit can highlight)")
+		nbrOutTop  = flag.Int("nbr-out-top", 10000, "top modules by out-degree that also get a neighbor file")
 		labelChunk = flag.Int("label-chunk", 4096, "labels per chunk file")
 	)
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.LUTC)
 	start := time.Now()
+	// The labels/ and nbr/ trees are keyed by kept index, which changes
+	// between layout runs — stale files from a previous export would be
+	// silently wrong, so both trees start from scratch.
+	for _, d := range []string{filepath.Join(*webDir, "labels"), filepath.Join(*webDir, "nbr")} {
+		if err := os.RemoveAll(d); err != nil {
+			log.Fatal(err)
+		}
+	}
 	for _, d := range []string{*webDir, filepath.Join(*webDir, "labels"), filepath.Join(*webDir, "nbr")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			log.Fatal(err)
@@ -90,7 +99,7 @@ func main() {
 	copyFile(filepath.Join(*layoutDir, "positions.bin"), filepath.Join(*webDir, "positions.bin"), 8*n)
 	writeLabels(filepath.Join(*webDir, "labels"), paths, *labelChunk)
 	writeSearch(filepath.Join(*webDir, "search.json"), paths, inDeg, *searchTop)
-	hubs := writeNeighbors(*webDir, origToKept, from, to, inDeg, outDeg, *nbrTop)
+	hubs := writeNeighbors(*webDir, origToKept, from, to, inDeg, outDeg, *nbrTop, *nbrOutTop)
 
 	var maxIn uint32
 	for _, d := range inDeg {
@@ -179,24 +188,37 @@ func writeSearch(path string, paths []string, inDeg []uint32, top int) {
 }
 
 // writeNeighbors emits per-hub dependent/dependency lists (as kept
-// indices) for the top hubs by total degree, plus the index of which
-// nodes have one. Files are small for most hubs; testify's dependent
-// list is the biggest at ~1.4 MB.
-func writeNeighbors(webDir string, origToKept []int32, from, to []int32, inDeg, outDeg []uint32, top int) []int32 {
+// indices), plus the index of which nodes have one. Coverage is the
+// union of the top modules by in-degree (matching how the search table
+// ranks, so anything findable is also highlightable) and the top by
+// out-degree (the 1000-dependency monorepos are fun to click too).
+// Files are small for most hubs; testify's is the biggest at ~1.4 MB.
+func writeNeighbors(webDir string, origToKept []int32, from, to []int32, inDeg, outDeg []uint32, topIn, topOut int) []int32 {
 	n := len(inDeg)
-	idx := make([]int32, n)
-	for i := range idx {
-		idx[i] = int32(i)
-	}
-	sort.Slice(idx, func(a, b int) bool {
-		return inDeg[idx[a]]+outDeg[idx[a]] > inDeg[idx[b]]+outDeg[idx[b]]
-	})
-	if len(idx) > top {
-		idx = idx[:top]
+	rank := func(score []uint32, top int) []int32 {
+		idx := make([]int32, n)
+		for i := range idx {
+			idx[i] = int32(i)
+		}
+		sort.Slice(idx, func(a, b int) bool { return score[idx[a]] > score[idx[b]] })
+		if len(idx) > top {
+			idx = idx[:top]
+		}
+		return idx
 	}
 	isHub := make([]bool, n)
-	for _, k := range idx {
-		isHub[k] = true
+	var idx []int32
+	for _, k := range rank(inDeg, topIn) {
+		if !isHub[k] {
+			isHub[k] = true
+			idx = append(idx, k)
+		}
+	}
+	for _, k := range rank(outDeg, topOut) {
+		if !isHub[k] {
+			isHub[k] = true
+			idx = append(idx, k)
+		}
 	}
 	ins := make(map[int32][]int32, len(idx))
 	outs := make(map[int32][]int32, len(idx))

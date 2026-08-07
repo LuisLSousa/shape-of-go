@@ -2,4 +2,4 @@ module github.com/LuisLSousa/shape-of-go
 
 go 1.25.0
 
-require golang.org/x/mod v0.38.0 // indirect
+require golang.org/x/mod v0.38.0
