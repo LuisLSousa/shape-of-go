@@ -600,7 +600,9 @@ export default function App() {
           </div>
           <div className="hint">
             {selection.dependents === null && selection.dependencies === null
-              ? 'Neighbor highlighting is precomputed for the top 20,000 hubs; this module is dust — the honest kind.'
+              ? selection.inDeg > 0
+                ? 'Neighbor highlighting is precomputed for the biggest hubs; this module sits below that cutoff.'
+                : 'Nobody imports this module — dust, the honest kind. 93% of the galaxy is just like it.'
               : `Amber = modules that import it · aqua = what it imports.${
                   selection.edgesSampled ? ' Lines are a sample; every node is lit.' : ''
                 } Esc to clear.`}
