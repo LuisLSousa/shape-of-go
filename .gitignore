@@ -2,3 +2,5 @@ data/
 results/*.tmp
 .DS_Store
 bin/
+web/public/data/
+web/node_modules/
