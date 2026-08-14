@@ -389,13 +389,26 @@ canvas.galaxy.dragging {
   .header {
     max-width: calc(100vw - 48px);
   }
+  /* Search pinned to the very bottom, full width; the legend sits
+     above it, with its explainer note dropped so the two never
+     collide on short viewports. */
   .search {
     top: auto;
-    bottom: 84px;
-    right: 24px;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+  .search input {
+    font-size: 16px; /* stops iOS Safari zooming into the field */
   }
   .legend {
+    left: 16px;
+    bottom: 72px;
     width: 200px;
+  }
+  .legend .note {
+    display: none;
   }
   .info {
     bottom: auto;
