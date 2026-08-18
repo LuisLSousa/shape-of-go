@@ -220,7 +220,13 @@ func topK(score []float64, k int) []int {
 	for i := range idx {
 		idx[i] = i
 	}
-	sort.Slice(idx, func(a, b int) bool { return score[idx[a]] > score[idx[b]] })
+	// Ties break on node id so the listing is byte-stable across runs.
+	sort.Slice(idx, func(a, b int) bool {
+		if score[idx[a]] != score[idx[b]] {
+			return score[idx[a]] > score[idx[b]]
+		}
+		return idx[a] < idx[b]
+	})
 	if len(idx) > k {
 		idx = idx[:k]
 	}

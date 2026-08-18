@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -49,12 +50,17 @@ func writeDegreeSVG(path string, hist map[int32]int64, alpha float64, kmin int32
 	fmt.Fprintf(&s, `<text x="%.1f" y="%.1f" font-size="11" fill="%s" text-anchor="middle">in-degree k (direct dependents)</text>`, (mL+w-mR)/2, h-12, inkSoft)
 	fmt.Fprintf(&s, `<text x="16" y="%.1f" font-size="11" fill="%s" text-anchor="middle" transform="rotate(-90 16 %.1f)">number of modules</text>`, (mT+h-mB)/2, inkSoft, (mT+h-mB)/2)
 
-	// Data points.
-	for k, c := range hist {
-		if k == 0 {
-			continue
+	// Data points, in degree order so the file is byte-stable across
+	// runs (map iteration order is not).
+	keys := make([]int32, 0, len(hist))
+	for k := range hist {
+		if k != 0 {
+			keys = append(keys, k)
 		}
-		fmt.Fprintf(&s, `<circle cx="%.1f" cy="%.1f" r="1.6" fill="%s" opacity="0.55"/>`, lx(float64(k)), ly(float64(c)), blue)
+	}
+	sort.Slice(keys, func(a, b int) bool { return keys[a] < keys[b] })
+	for _, k := range keys {
+		fmt.Fprintf(&s, `<circle cx="%.1f" cy="%.1f" r="1.6" fill="%s" opacity="0.55"/>`, lx(float64(k)), ly(float64(hist[k])), blue)
 	}
 	// Fitted power law, anchored at (kmin, count(kmin)).
 	if c0, ok := hist[kmin]; ok && c0 > 0 {
