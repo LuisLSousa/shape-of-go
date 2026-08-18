@@ -339,6 +339,13 @@ export default function App() {
     let lastX = 0
     let lastY = 0
     let hoverTimer = 0
+    // Multi-touch: two active pointers pinch-zoom around their midpoint
+    // and pan with it; the map keeps insertion order, so the first two
+    // entries are the gesture even if a third finger lands.
+    const pointers = new Map<number, { x: number; y: number }>()
+    let pinchDist = 0
+    let pinchMidX = 0
+    let pinchMidY = 0
 
     const pickAt = (px: number, py: number): number => {
       const [wx, wy] = camera.screenToWorld(px, py, canvas.clientWidth, canvas.clientHeight)
@@ -346,14 +353,51 @@ export default function App() {
     }
 
     const onPointerDown = (e: PointerEvent) => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      canvas.setPointerCapture(e.pointerId)
+      if (pointers.size === 2) {
+        // Second finger down: leave pan mode, start the pinch.
+        const [a, b] = [...pointers.values()]
+        pinchDist = Math.hypot(a.x - b.x, a.y - b.y)
+        pinchMidX = (a.x + b.x) / 2
+        pinchMidY = (a.y + b.y) / 2
+        dragging = false
+        moved = true // releasing after a pinch must not select
+        setHover(null)
+        return
+      }
+      if (pointers.size > 2) return
       dragging = true
       moved = false
       lastX = e.clientX
       lastY = e.clientY
       canvas.classList.add('dragging')
-      canvas.setPointerCapture(e.pointerId)
     }
     const onPointerMove = (e: PointerEvent) => {
+      if (pointers.has(e.pointerId)) {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      }
+      if (pointers.size >= 2) {
+        const [a, b] = [...pointers.values()]
+        const dist = Math.hypot(a.x - b.x, a.y - b.y)
+        const midX = (a.x + b.x) / 2
+        const midY = (a.y + b.y) / 2
+        const rect = canvas.getBoundingClientRect()
+        if (pinchDist > 0 && dist > 0) {
+          camera.zoomAt(
+            dist / pinchDist,
+            midX - rect.left,
+            midY - rect.top,
+            canvas.clientWidth,
+            canvas.clientHeight,
+          )
+        }
+        camera.pan(midX - pinchMidX, midY - pinchMidY)
+        pinchDist = dist
+        pinchMidX = midX
+        pinchMidY = midY
+        return
+      }
       if (dragging) {
         const dx = e.clientX - lastX
         const dy = e.clientY - lastY
@@ -380,6 +424,18 @@ export default function App() {
       }, 60)
     }
     const onPointerUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId)
+      if (pointers.size === 1) {
+        // Pinch ended with one finger still down: hand off to panning.
+        const [p] = [...pointers.values()]
+        dragging = true
+        moved = true
+        lastX = p.x
+        lastY = p.y
+        pinchDist = 0
+        return
+      }
+      if (pointers.size > 1) return
       canvas.classList.remove('dragging')
       if (!dragging) return
       dragging = false
@@ -400,16 +456,26 @@ export default function App() {
       window.clearTimeout(hoverTimer)
       setHover(null)
     }
+    const onPointerCancel = (e: PointerEvent) => {
+      pointers.delete(e.pointerId)
+      if (pointers.size === 0) {
+        dragging = false
+        pinchDist = 0
+        canvas.classList.remove('dragging')
+      }
+    }
 
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
+    canvas.addEventListener('pointercancel', onPointerCancel)
     canvas.addEventListener('pointerleave', onLeave)
     canvas.addEventListener('wheel', onWheel, { passive: false })
     return () => {
       canvas.removeEventListener('pointerdown', onPointerDown)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('pointercancel', onPointerCancel)
       canvas.removeEventListener('pointerleave', onLeave)
       canvas.removeEventListener('wheel', onWheel)
       window.clearTimeout(hoverTimer)
