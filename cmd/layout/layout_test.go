@@ -112,7 +112,7 @@ func TestLayoutDeterminism(t *testing.T) {
 
 func TestPairEquilibrium(t *testing.T) {
 	// Two connected nodes with no gravity settle where linear
-	// attraction d balances repulsion kr·m²/d: d = m·sqrt(kr).
+	// attraction d balances repulsion kr*m^2/d: d = m*sqrt(kr).
 	adjOff := []int32{0, 1, 2}
 	adj := []int32{1, 0}
 	kr := 10.0

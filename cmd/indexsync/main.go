@@ -5,7 +5,7 @@
 // page the checkpoint file is atomically rewritten with the boundary
 // timestamp (and the record keys seen at that exact timestamp, to
 // de-duplicate the inclusive `since` boundary). Interrupt the process
-// at any point — Ctrl-C, network drop, laptop sleep — and re-running
+// at any point (Ctrl-C, network drop, laptop sleep) and re-running
 // resumes where it left off. Transient network failures never kill the
 // process: requests retry forever with capped exponential backoff, so a
 // machine that sleeps mid-page simply stalls and recovers on wake.

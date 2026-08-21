@@ -1,11 +1,11 @@
 // Galaxy color system. Two encodings, both validated with the dataviz
 // palette validator against the space surface (#06060e):
 //
-//  - degree: SEQUENTIAL indigo, dim → white-hot, driven by log in-degree.
-//    The near-zero end deliberately recedes into the surface — 93% of
+//  - degree: SEQUENTIAL indigo, dim -> white-hot, driven by log in-degree.
+//    The near-zero end deliberately recedes into the surface: 93% of
 //    the ecosystem is never-imported dust and should read as background.
-//  - year: ORDINAL amber, 8 monotone-lightness steps for the 2019–2026
-//    first-seen cohorts (all ordinal gates pass: ΔL ≥ 0.06 per step,
+//  - year: ORDINAL amber, 8 monotone-lightness steps for the 2019-2026
+//    first-seen cohorts (all ordinal gates pass: delta-L >= 0.06 per step,
 //    dark end 2.95:1 vs surface, single hue).
 
 export const SURFACE = '#06060e'
@@ -27,10 +27,15 @@ export const YEAR_STEPS = [
 // the modules that import it, and the modules it imports. Each is also
 // named with a colored dot + text in the info panel, so identity never
 // rides on color alone.
+//
+// dependencies was #34d399 (green) until 2026-08-18: yellow/green sat at
+// CVD dE 10.6 (protan) — above the formal floor of 8 but weak in
+// practice for a red-green colorblind reader. Yellow/blue measures
+// 26.1 protan / 30.3 deutan, and 9.4:1 against the surface.
 export const SELECT_COLORS = {
   selected: '#ffffff',
   dependents: '#fbbf24',
-  dependencies: '#34d399',
+  dependencies: '#38bdf8',
 }
 
 function hexToRgb(hex: string): [number, number, number] {

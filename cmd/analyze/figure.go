@@ -10,7 +10,7 @@ import (
 )
 
 // writeDegreeSVG renders the in-degree distribution on log-log axes
-// with the fitted power law overlaid — the scale-free signature plot.
+// with the fitted power law overlaid: the scale-free signature plot.
 func writeDegreeSVG(path string, hist map[int32]int64, alpha float64, kmin int32) {
 	const (
 		w, h                = 640.0, 460.0

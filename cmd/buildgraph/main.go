@@ -3,7 +3,7 @@
 //
 // Nodes are module paths. Every fetched module is a node; so is every
 // module that appears as a requirement, even if it was never fetched
-// (marked unresolved — retracted, private, or renamed modules).
+// (marked unresolved: retracted, private, or renamed modules).
 //
 // Edges follow direct dependencies only: one edge per (module,
 // require) pair for requires not marked "// indirect", so the graph

@@ -175,7 +175,7 @@ func (l *layout) parallelNodes(fn func(lo, hi int)) {
 	wg.Wait()
 }
 
-// radius reports the root-mean-square distance from the origin — a
+// radius reports the root-mean-square distance from the origin, a
 // cheap convergence signal for the progress log.
 func (l *layout) radius() float64 {
 	var s float64

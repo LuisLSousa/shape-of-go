@@ -1,11 +1,11 @@
 // Command powerlaw fits a discrete power law to a degree histogram the
-// defensible way — Clauset, Shalizi & Newman (2009) — instead of the
+// defensible way (Clauset, Shalizi & Newman, 2009), instead of the
 // quick fixed-kmin estimate cmd/analyze prints:
 //
-//   - exact discrete maximum-likelihood α (Hurwitz-zeta normalization,
+//   - exact discrete maximum-likelihood alpha (Hurwitz-zeta normalization,
 //     not the continuous approximation),
 //   - kmin chosen by scanning every candidate and keeping the one whose
-//     fitted tail is closest to the data (minimal Kolmogorov–Smirnov
+//     fitted tail is closest to the data (minimal Kolmogorov-Smirnov
 //     distance),
 //   - a goodness-of-fit p-value from the semi-parametric bootstrap:
 //     synthetic datasets drawn from the fitted model plus the empirical

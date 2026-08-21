@@ -192,8 +192,8 @@ func scanShards(dir string, retryErrors bool) map[string]bool {
 			done[r.Path] = true
 		}
 		if err := sc.Err(); err != nil {
-			// A truncated shard tail (crash mid-write) is recoverable —
-			// affected modules just refetch — but surface it.
+			// A truncated shard tail (crash mid-write) is recoverable
+			// (affected modules just refetch), but surface it.
 			log.Printf("warning: reading %s: %v", m, err)
 		}
 		f.Close()
@@ -253,7 +253,7 @@ func startTokens(perSecond int) {
 
 // Storm breaker: scattered 403s are per-module legal blocks and only
 // cost that module, but a long run of consecutive 403s with no success
-// in between means the proxy is refusing *us* — then the whole fleet
+// in between means the proxy is refusing *us*: then the whole fleet
 // pauses. A single blocked module can never trip this, because every
 // success resets the streak.
 var (

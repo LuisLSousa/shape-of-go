@@ -232,7 +232,7 @@ export default function App() {
         })
         // Cap the drawn edges: additive lines all converge on the hub,
         // so past ~20k segments the epicenter just saturates to white.
-        // Node highlighting stays complete — only lines are sampled.
+        // Node highlighting stays complete; only lines are sampled.
         const MAX_EDGES = 20000
         let sampled = false
         const segs = (list: Uint32Array) => {
@@ -313,7 +313,7 @@ export default function App() {
 
   // ?m=<module path> deep-links straight to a module (also handy for
   // headless screenshot tests of the selection state). Deep links jump
-  // instantly — the fly-to animation is for interactive search only.
+  // instantly; the fly-to animation is for interactive search only.
   useEffect(() => {
     if (!data || !canvasRef.current) return
     const target = new URLSearchParams(window.location.search).get('m')
@@ -670,7 +670,7 @@ export default function App() {
               ? selection.inDeg > 0
                 ? 'Neighbor highlighting is precomputed for the biggest hubs; this module sits below that cutoff.'
                 : 'Nobody imports this module — dust, the honest kind. 93% of the galaxy is just like it.'
-              : `Amber = modules that import it · aqua = what it imports.${
+              : `Yellow = modules that import it · blue = what it imports.${
                   selection.edgesSampled ? ' Lines are a sample; every node is lit.' : ''
                 } Esc to clear.`}
           </div>

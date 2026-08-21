@@ -61,7 +61,7 @@ export class Camera {
     this.cy = wy + (py - h / 2) / this.zoom
   }
 
-  /** Instant reposition — deep links land, they don't travel. */
+  /** Instant reposition: deep links land, they don't travel. */
   jumpTo(wx: number, wy: number, zoom: number) {
     this.anim = null
     this.cx = wx
@@ -84,7 +84,7 @@ export class Camera {
     const { from, to, start, duration } = this.anim
     const t = Math.min(1, (now - start) / duration)
     const e = EASE(t)
-    // Interpolate zoom geometrically — perceptually uniform.
+    // Interpolate zoom geometrically, which is perceptually uniform.
     this.zoom = from.zoom * Math.pow(to.zoom / from.zoom, e)
     this.cx = from.cx + (to.cx - from.cx) * e
     this.cy = from.cy + (to.cy - from.cy) * e

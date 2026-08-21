@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # Deploys the built galaxy viewer (web/dist, ~79 MB with data assets).
+# This is the author's deploy tooling, kept in the repo so the hosting
+# setup is reproducible; running it from a clone deploys to your own
+# Cloudflare account / fork, not to the URLs below.
 #
-# Two targets, pick with the first argument:
+# Targets:
 #
 #   ./scripts/deploy-viewer.sh cloudflare
-#       Direct upload to Cloudflare Pages (project "shape-of-go" →
-#       https://shape-of-go.pages.dev). Needs a one-time
-#       `npx wrangler login` first. No repo, no DNS; unmetered
-#       bandwidth — this is the host that survives a front-page day.
+#       Direct upload to the "shape-of-go" Cloudflare Pages project
+#       (https://shape-of-go.pages.dev). Run `npx wrangler login` once
+#       first. Unmetered bandwidth.
 #
 #   ./scripts/deploy-viewer.sh github
-#       Publishes web/dist to an orphan gh-pages branch and pushes it.
-#       GitHub Pages (Settings → Pages → deploy from gh-pages branch)
-#       then serves it at https://luislsousa.github.io/shape-of-go/.
-#       NOTE: on the free plan this only works once the repo is public.
-#       Soft bandwidth guideline is 100 GB/month (~5,400 cold visitors
-#       at the measured 18.6 MB cold load) — fine for steady state, not
-#       for a front-page spike; keep Cloudflare as the pressure valve.
+#       Pushes web/dist to an orphan gh-pages branch, served at
+#       https://luislsousa.github.io/shape-of-go/ (enable in Settings,
+#       Pages, deploy from branch). Needs a public repo on the free
+#       plan. GitHub applies a soft 100 GB/month bandwidth guideline;
+#       the cold load is ~18.6 MB, so send heavy traffic to Cloudflare.
 #
 # The build is reproduced from scratch each time; data assets come from
 # web/public/data (exported by cmd/export, gitignored on main).

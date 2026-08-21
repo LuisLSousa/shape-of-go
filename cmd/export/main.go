@@ -1,20 +1,20 @@
 // Command export packages a finished layout run into the static assets
 // the web galaxy viewer loads: positions, per-node attributes, label
 // chunks, a search table, and neighbor lists for the top hubs. All
-// binary files are little-endian and indexed by "kept index" — the node
+// binary files are little-endian and indexed by "kept index", the node
 // order of layout's positions.bin.
 //
 // Output (in -web):
 //
 //	galaxy.json      manifest: counts, chunking, file inventory
-//	positions.bin    copied from the layout run (2 × float32 per node)
-//	attrs.bin        n × uint32 full-graph in-degree, then n × uint8
+//	positions.bin    copied from the layout run (2 * float32 per node)
+//	attrs.bin        n * uint32 full-graph in-degree, then n * uint8
 //	                 first-seen year offset from 2019 (255 = unknown)
 //	labels/<c>.json  node paths in kept order, -label-chunk per file
 //	search.json      [path, keptIdx, inDegree] for the top -search-top
 //	nbr-index.bin    hub lookup table: header, then sorted kept indices,
 //	                 byte offsets, byte lengths, shard ids
-//	nbr/<s>.bin      shard holding many hubs' neighbor records —
+//	nbr/<s>.bin      shard holding many hubs' neighbor records;
 //	                 powers click-to-highlight
 //
 // Neighbor records are delta-varint encoded (see writeNeighbors) and
@@ -58,7 +58,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
 	start := time.Now()
 	// The labels/ and nbr/ trees are keyed by kept index, which changes
-	// between layout runs — stale files from a previous export would be
+	// between layout runs; stale files from a previous export would be
 	// silently wrong, so both trees start from scratch.
 	for _, d := range []string{filepath.Join(*webDir, "labels"), filepath.Join(*webDir, "nbr")} {
 		if err := os.RemoveAll(d); err != nil {
@@ -212,8 +212,8 @@ func writeSearch(path string, paths []string, inDeg []uint32, top int) {
 //
 // Each record is: uvarint dependent count, uvarint dependency count,
 // then both lists as ascending delta uvarints. Sorting makes the deltas
-// small — a hub with 300k dependents scattered over 1.2M nodes averages
-// a delta near 4, so one byte replaces four — and makes output
+// small (a hub with 300k dependents scattered over 1.2M nodes averages
+// a delta near 4, so one byte replaces four) and makes output
 // deterministic. Binaries are served uncompressed, so this encoding is
 // the only compression lever available for them.
 func writeNeighbors(webDir string, origToKept []int32, from, to []int32, inDeg, outDeg []uint32, topIn, topOut, shardBudget int) (hubs []int32, shards int) {

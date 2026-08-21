@@ -135,7 +135,7 @@ func (q *quadtree) childFor(c int32, x, y float64) int32 {
 }
 
 // repulsion accumulates the Barnes-Hut approximated repulsion force on
-// a probe of mass m at (x, y): F = kr·m·m_cell/d per interaction. A
+// a probe of mass m at (x, y): F = kr*m*m_cell/d per interaction. A
 // cell is taken whole when its width over the distance to its center
 // of mass is below theta. The caller provides a reusable stack.
 func (q *quadtree) repulsion(x, y, m, kr, theta float64, stack []int32) (fx, fy float64) {
@@ -152,10 +152,10 @@ func (q *quadtree) repulsion(x, y, m, kr, theta float64, stack []int32) (fx, fy 
 		width2 := 4 * q.half[c] * q.half[c]
 		if q.leaf[c] || width2 < theta2*d2 {
 			// Skip self-interaction and coincident aggregates: the
-			// probe's own leaf sits at d≈0, where the direction is
+			// probe's own leaf sits at d~0, where the direction is
 			// undefined and the magnitude diverges. Distinct points
 			// that are exactly coincident exert no force and travel
-			// together — a zero-probability event under the
+			// together, a zero-probability event under the
 			// continuous random init.
 			if d2 < 1e-12 {
 				continue

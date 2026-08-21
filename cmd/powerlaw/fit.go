@@ -17,7 +17,7 @@ import (
 
 // hist is a degree histogram: parallel slices sorted by degree, plus
 // the total observation count. All fitting works on this sufficient
-// statistic — the raw node list is never needed.
+// statistic; the raw node list is never needed.
 type hist struct {
 	ks     []int64
 	counts []int64
@@ -67,9 +67,10 @@ func (b byDegree) Swap(i, j int) {
 	b.h.counts[i], b.h.counts[j] = b.h.counts[j], b.h.counts[i]
 }
 
-// zetaHurwitz computes the Hurwitz zeta function ζ(s, q) = Σ (q+i)^-s
-// for s > 1, q >= 1, via Euler–Maclaurin: fifteen explicit terms, the
-// integral remainder, and three correction terms. Absolute error is far
+// zetaHurwitz computes the Hurwitz zeta function zeta(s, q), the sum
+// of (q+i)^-s, for s > 1, q >= 1, via Euler-Maclaurin: fifteen
+// explicit terms, the integral remainder, and three correction
+// terms. Absolute error is far
 // below 1e-10 over the (s, q) ranges the fit visits.
 func zetaHurwitz(s, q float64) float64 {
 	const terms = 15
@@ -87,7 +88,7 @@ func zetaHurwitz(s, q float64) float64 {
 }
 
 // tailOf returns the index of the first degree >= kmin, the tail count,
-// and Σ c_k·ln k over the tail.
+// and the sum of c_k*ln k over the tail.
 func (h hist) tailOf(kmin int64) (first int, n int64, sumLogK float64) {
 	first = sort.Search(len(h.ks), func(i int) bool { return h.ks[i] >= kmin })
 	for i := first; i < len(h.ks); i++ {
@@ -99,10 +100,10 @@ func (h hist) tailOf(kmin int64) (first int, n int64, sumLogK float64) {
 
 // mleAlpha maximizes the discrete power-law log-likelihood
 //
-//	L(α) = −n·ln ζ(α, kmin) − α·Σ c_k·ln k
+//	L(alpha) = -n*ln zeta(alpha, kmin) - alpha*(the sum of c_k*ln k)
 //
 // over the tail k >= kmin by golden-section search. The likelihood is
-// strictly unimodal in α, so the bracket [1.01, 12] is safe for any
+// strictly unimodal in alpha, so the bracket [1.01, 12] is safe for any
 // degree data this pipeline produces.
 func mleAlpha(kmin int64, n int64, sumLogK float64) float64 {
 	logL := func(alpha float64) float64 {
@@ -127,7 +128,7 @@ func mleAlpha(kmin int64, n int64, sumLogK float64) float64 {
 	return (lo + hi) / 2
 }
 
-// ksDistance is the Kolmogorov–Smirnov statistic between the tail's
+// ksDistance is the Kolmogorov-Smirnov statistic between the tail's
 // empirical CDF and the fitted discrete power law, both conditioned on
 // k >= kmin, evaluated at every distinct observed degree.
 func ksDistance(h hist, first int, n int64, kmin int64, alpha float64) float64 {
@@ -175,8 +176,8 @@ func departureK(h hist, res fitResult) int64 {
 }
 
 // fit scans every distinct degree >= 1 that leaves at least minTail
-// tail observations, fits α by MLE at each, and keeps the kmin whose
-// fitted tail has the smallest KS distance — the CSN recipe.
+// tail observations, fits alpha by MLE at each, and keeps the kmin whose
+// fitted tail has the smallest KS distance: the CSN recipe.
 func fit(h hist, minTail int64, workers int) fitResult {
 	var candidates []int64
 	for _, k := range h.ks {
@@ -218,7 +219,7 @@ func fit(h hist, minTail int64, workers int) fitResult {
 
 // tailSampler draws degrees from the fitted discrete power law by
 // inverse transform: a CDF table covers the bulk, and the (heavy) tail
-// beyond the table is inverted with a zeta bisection — for α < 2 no
+// beyond the table is inverted with a zeta bisection: for alpha < 2 no
 // table can hold enough mass for table-only sampling.
 type tailSampler struct {
 	kmin  int64
@@ -231,7 +232,7 @@ func newTailSampler(kmin int64, alpha float64) *tailSampler {
 	s := &tailSampler{kmin: kmin, alpha: alpha, zKmin: zetaHurwitz(alpha, float64(kmin))}
 	const tableLen = 1 << 20
 	s.cdf = make([]float64, tableLen)
-	// Built by accumulating the pmf P(K = k) = k^-α / ζ(α, kmin); one
+	// Built by accumulating the pmf P(K = k) = k^-alpha / zeta(alpha, kmin); one
 	// pow per entry instead of a zeta evaluation each.
 	cum := 0.0
 	for i := range s.cdf {
@@ -247,7 +248,7 @@ func (s *tailSampler) draw(r *rand.Rand) int64 {
 		i := sort.SearchFloat64s(s.cdf, u)
 		return s.kmin + int64(i)
 	}
-	// Rare deep-tail draw: bisect k on P(K > k) = ζ(α, k+1)/ζ(α, kmin).
+	// Rare deep-tail draw: bisect k on P(K > k) = zeta(alpha, k+1)/zeta(alpha, kmin).
 	lo := s.kmin + int64(len(s.cdf))
 	hi := lo
 	for zetaHurwitz(s.alpha, float64(hi+1))/s.zKmin > 1-u {
@@ -268,9 +269,9 @@ func (s *tailSampler) draw(r *rand.Rand) int64 {
 }
 
 // bootstrapP runs the CSN semi-parametric bootstrap: each replicate
-// draws h.total observations — from the fitted power law with the
+// draws h.total observations (from the fitted power law with the
 // observed tail probability, otherwise from the empirical body below
-// kmin — then refits kmin and α from scratch and records whether its KS
+// kmin), then refits kmin and alpha from scratch and records whether its KS
 // distance reaches the observed one. The returned p is the fraction
 // that did; small p means the data deviate from a power law by more
 // than the model's own fluctuations.

@@ -2,7 +2,7 @@
 // It loads the buildgraph node/edge tables, keeps the giant weakly-
 // connected component (optionally thinned to a minimum in-degree for
 // fast development runs), and runs ForceAtlas2 with Barnes-Hut
-// repulsion — the standard layout for large scale-free networks.
+// repulsion, the standard layout for large scale-free networks.
 //
 // The run is deterministic (seeded init, fixed reduction order),
 // parallel across cores, and checkpointed: positions are written every
@@ -11,8 +11,8 @@
 //
 // Output (in -out):
 //
-//	positions.bin  kept-node positions, 2 × float32 little-endian each
-//	kept.tsv       kept index (line number) → original node id
+//	positions.bin  kept-node positions, 2 * float32 little-endian each
+//	kept.tsv       kept index (line number) -> original node id
 //	meta.json      node/edge counts and the exact parameters used
 //	preview.png    additive scatter render of the current positions
 package main

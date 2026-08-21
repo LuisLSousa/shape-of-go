@@ -64,12 +64,12 @@ func TestMLERecoversAlpha(t *testing.T) {
 }
 
 func TestFitStaysOutOfBody(t *testing.T) {
-	// Power-law tail from kmin=8 under a FLAT body — a shape no power
+	// Power-law tail from kmin=8 under a FLAT body, a shape no power
 	// law can imitate. Any kmin >= 8 is a correct fit (a power-law tail
-	// from 8 is also one from any larger cutoff, with the same α), and
+	// from 8 is also one from any larger cutoff, with the same alpha), and
 	// the CSN kmin estimator is known to spread upward on finite
 	// samples. The failures worth catching are kmin dipping INTO the
-	// body, a runaway kmin, or a wrong α.
+	// body, a runaway kmin, or a wrong alpha.
 	const alpha, kmin = 2.2, 8
 	for _, seed := range []uint64{3, 7, 11} {
 		h := synthetic(150_000, alpha, kmin, seed)

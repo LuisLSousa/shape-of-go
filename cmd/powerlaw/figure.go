@@ -90,7 +90,7 @@ func writeCCDFSVG(path string, h hist, res fitResult, label string) error {
 		fmt.Fprintf(&s, `<circle cx="%.1f" cy="%.1f" r="1.6" fill="%s" opacity="0.55"/>`, lx(float64(ks[i])), ly(p[i]), blue)
 	}
 
-	// Fitted tail: P(K >= k) = P_emp(K >= kmin) · ζ(α,k)/ζ(α,kmin),
+	// Fitted tail: P(K >= k) = P_emp(K >= kmin) * zeta(alpha,k)/zeta(alpha,kmin),
 	// drawn only over the fitted range, per CSN.
 	_, tailN, _ := h.tailOf(res.kmin)
 	anchor := float64(tailN) / float64(h.total)

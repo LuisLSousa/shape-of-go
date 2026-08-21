@@ -11,7 +11,7 @@ import (
 )
 
 // writePreview renders the positions as an additive-brightness scatter
-// on black — a cheap approximation of the WebGL galaxy view, meant for
+// on black, a cheap approximation of the WebGL galaxy view, meant for
 // eyeballing a long layout run from the terminal.
 func writePreview(path string, pos []float64) {
 	const size = 1600

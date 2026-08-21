@@ -1,7 +1,7 @@
 // WebGL2 renderer: the whole galaxy is one additive-blended POINTS draw
 // over a static position buffer; selection adds two LINES draws (edges
 // to dependents / dependencies) built on demand. Color comes from a
-// 256×2 ramp texture (row 0 degree, row 1 cohort year) so switching
+// 256x2 ramp texture (row 0 degree, row 1 cohort year) so switching
 // modes is a uniform, not a buffer rewrite.
 
 import { rampTextureData, SELECT_COLORS, SURFACE } from './palette'
@@ -28,6 +28,7 @@ uniform float uDpr;
 uniform int uMode;
 uniform float uHasSelection;
 uniform float uSelAlpha;
+uniform float uFitZoom;
 uniform sampler2D uRamp;
 out vec4 vColor;
 out float vCore;
@@ -53,14 +54,21 @@ void main() {
   // Size: dust stays ~1px, hubs grow with log degree; zooming in
   // grows everything gently (sub-linear) so the core never floods.
   float zoomGrow = pow(clamp(uZoom, 0.001, 100.0), 0.18);
-  float size = (1.3 + 26.0 * pow(deg, 1.35)) * zoomGrow * uDpr;
+  // Lonely-dust compensation: additive brightness relies on density,
+  // so once the view zooms past the cloud an isolated dust point is a
+  // near-invisible pixel. Past ~4x the fit zoom, low-degree points
+  // gain size and alpha with depth; the overview is untouched.
+  float depth = uZoom / max(uFitZoom, 1e-6);
+  float lonely = clamp((depth - 4.0) / 12.0, 0.0, 1.0) * (1.0 - deg);
+  float size = (1.3 + 26.0 * pow(deg, 1.35)) * zoomGrow * uDpr + 4.0 * lonely * uDpr;
   if (s == ${STATE_SELECTED}) size = max(size * 1.8, 14.0 * uDpr);
   gl_PointSize = clamp(size, 1.0, 96.0 * uDpr);
 
   // Brightness: dim everything that isn't part of an active selection.
   // uSelAlpha shrinks with the highlight count so a 300k-node blast
   // stays readable while a 500-node one keeps full drama.
-  float alpha = 0.28 + 0.6 * deg;
+  float alpha = 0.55 + 0.33 * deg;
+  alpha = min(1.0, alpha + 0.4 * lonely);
   if (uHasSelection > 0.5) {
     alpha = s == ${STATE_DIM} ? alpha * 0.05 : min(1.0, (alpha * 1.6 + 0.25) * uSelAlpha);
   }
@@ -164,7 +172,7 @@ export class GalaxyRenderer {
 
     this.pointProgram = link(gl, POINT_VS, POINT_FS)
     this.lineProgram = link(gl, LINE_VS, LINE_FS)
-    for (const name of ['uCenter', 'uZoom', 'uViewport', 'uDpr', 'uMode', 'uHasSelection', 'uSelAlpha', 'uRamp']) {
+    for (const name of ['uCenter', 'uZoom', 'uViewport', 'uDpr', 'uMode', 'uHasSelection', 'uSelAlpha', 'uFitZoom', 'uRamp']) {
       this.uniforms[name] = gl.getUniformLocation(this.pointProgram, name)
     }
     for (const name of ['uCenter', 'uZoom', 'uViewport', 'uColor', 'uAlpha']) {
@@ -245,20 +253,29 @@ export class GalaxyRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT)
 
     if (this.edges.length > 0) {
-      // Rays answer "how far does this reach" at overview zoom; up
-      // close they are pure glare, so fade them out as zoom deepens.
+      // Rays answer "how far does this reach" at overview zoom; when
+      // thousands converge they are pure glare up close, so they fade
+      // with zoom depth. Small selections don't glare, so their rays
+      // get a brighter base and a fade floor and stay readable zoomed
+      // in.
       const zoomFade = Math.min(1, (camera.fitZoom * 4) / camera.zoom)
-      if (zoomFade > 0.02) {
-        gl.useProgram(this.lineProgram)
-        gl.uniform2f(this.lineUniforms.uCenter, camera.cx, camera.cy)
-        gl.uniform1f(this.lineUniforms.uZoom, camera.zoom)
-        gl.uniform2f(this.lineUniforms.uViewport, widthPx, heightPx)
-        for (const e of this.edges) {
-          gl.bindVertexArray(e.vao)
-          gl.uniform3f(this.lineUniforms.uColor, e.color[0], e.color[1], e.color[2])
-          gl.uniform1f(this.lineUniforms.uAlpha, Math.min(0.3, 220 / e.count) * zoomFade)
-          gl.drawArrays(gl.LINES, 0, e.count)
-        }
+      gl.useProgram(this.lineProgram)
+      gl.uniform2f(this.lineUniforms.uCenter, camera.cx, camera.cy)
+      gl.uniform1f(this.lineUniforms.uZoom, camera.zoom)
+      gl.uniform2f(this.lineUniforms.uViewport, widthPx, heightPx)
+      for (const e of this.edges) {
+        const base = Math.min(0.3, Math.max(220 / e.count, e.count < 6000 ? 0.12 : 0))
+        const fade = Math.max(zoomFade, Math.min(0.65, 1600 / e.count))
+        // Deep-zoom floor: never fade a fan to nothing, or zoomed-in
+        // views read as "the links disappeared". Phases in as the
+        // zoom fade bottoms out, so overview brightness is untouched;
+        // small fans are already floored higher via `fade`.
+        const depthFloor = 0.012 * Math.min(1, Math.max(0, (0.5 - zoomFade) / 0.35))
+        const alpha = Math.max(base * fade, depthFloor)
+        gl.bindVertexArray(e.vao)
+        gl.uniform3f(this.lineUniforms.uColor, e.color[0], e.color[1], e.color[2])
+        gl.uniform1f(this.lineUniforms.uAlpha, alpha)
+        gl.drawArrays(gl.LINES, 0, e.count)
       }
     }
 
@@ -270,6 +287,7 @@ export class GalaxyRenderer {
     gl.uniform1i(this.uniforms.uMode, mode === 'degree' ? 0 : 1)
     gl.uniform1f(this.uniforms.uHasSelection, hasSelection ? 1 : 0)
     gl.uniform1f(this.uniforms.uSelAlpha, this.selAlpha)
+    gl.uniform1f(this.uniforms.uFitZoom, camera.fitZoom)
     gl.uniform1i(this.uniforms.uRamp, 0)
     gl.bindVertexArray(this.pointVao)
     gl.drawArrays(gl.POINTS, 0, this.n)

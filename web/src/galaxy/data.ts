@@ -69,7 +69,7 @@ export class NbrIndex {
   constructor(buf: ArrayBuffer) {
     const header = new Uint32Array(buf, 0, 4)
     if (header[0] !== NBR_MAGIC) {
-      throw new Error('nbr-index.bin: bad magic — stale or truncated asset tree')
+      throw new Error('nbr-index.bin: bad magic: stale or truncated asset tree')
     }
     if (header[1] !== 1) {
       throw new Error(`nbr-index.bin: unsupported format version ${header[1]}`)

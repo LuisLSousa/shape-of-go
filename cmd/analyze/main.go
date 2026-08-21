@@ -5,9 +5,9 @@
 // the headline extremes. Results are written as TSVs plus a log-log
 // degree-distribution SVG, and a summary is printed.
 //
-// The directed-graph machinery that first shipped here — dual-CSR
+// The directed-graph machinery that first shipped here (dual-CSR
 // adjacency, pull-based PageRank with dangling redistribution, weak
-// components — was extracted into gonx v1.1 (Digraph, metrics.PageRank,
+// components) was extracted into gonx v1.1 (Digraph, metrics.PageRank,
 // metrics.WeaklyConnectedComponents). analyze now consumes the library
 // it seeded.
 package main
