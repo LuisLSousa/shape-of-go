@@ -5,15 +5,13 @@ dependency edge, one graph. 2,638,112 modules, 9,443,537 edges, built
 from the official module index and proxy and analyzed with
 [gonx](https://github.com/LuisLSousa/gonx).
 
-<!-- Canonical viewer URL is GitHub Pages; https://shape-of-go.pages.dev
-     is the Cloudflare mirror and pressure valve if Pages throttles. -->
-[![The Go module galaxy: 1.24 million modules as a starfield](docs/images/galaxy-overview.jpg)](https://luislsousa.github.io/shape-of-go/)
+[![The Go module galaxy: 1.24 million modules as a starfield](docs/images/galaxy-overview.jpg)](https://shape-of-go.pages.dev/)
 
-**[Explore the galaxy live](https://luislsousa.github.io/shape-of-go/)**,
+**[Explore the galaxy live](https://shape-of-go.pages.dev/)**,
 or read the write-up:
 [The Shape of Go](https://luislsousa.com/blog/the-shape-of-go).
 
-## Where the data comes from (no scraping)
+## Where the data comes from
 
 The Go ecosystem publishes itself through two public, machine-readable
 services, the same ones every `go get` already talks to:
@@ -73,7 +71,7 @@ point cloud: brightness and size follow log in-degree (or first-seen
 cohort year), search covers the top 20k modules, and clicking a hub
 lights up every module that imports it.
 
-[![testify selected in the viewer: an amber burst of 346,205 dependents](docs/images/testify-selection.jpg)](https://luislsousa.github.io/shape-of-go/?m=github.com/stretchr/testify)
+[![testify selected in the viewer: an amber burst of 346,205 dependents](docs/images/testify-selection.jpg)](https://shape-of-go.pages.dev/?m=github.com/stretchr/testify)
 
 ## Status
 
