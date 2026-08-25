@@ -5,7 +5,7 @@ dependency edge, one graph. 2,638,112 modules, 9,443,537 edges, built
 from the official module index and proxy and analyzed with
 [gonx](https://github.com/LuisLSousa/gonx).
 
-[![The Go module galaxy: 1.24 million modules as a starfield](docs/images/galaxy-overview.jpg)](https://shape-of-go.pages.dev/)
+[![The Go module galaxy: the 1.24M-module connected component as a starfield](docs/images/galaxy-overview.jpg)](https://shape-of-go.pages.dev/)
 
 **[Explore the galaxy live](https://shape-of-go.pages.dev/)**,
 or read the write-up:
